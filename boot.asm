@@ -10,22 +10,16 @@ start:
     mov     sp, 0x7c00
     sti
 
-    mov     si, boot_msg
-    call    print_rm
+    mov     [boot_drive], dl
 
-    mov     cx, 12
-dotloop:
-    mov     si, dot
-    call    print_rm
-
-    mov     dx, 0xffff
-delay:
-    dec     dx
-    jnz     delay
-    loop    dotloop
-
-    mov     si, newline
-    call    print_rm
+    mov     ah, 0x02
+    mov     al, 0x04
+    mov     ch, 0x00
+    mov     dh, 0x00
+    mov     cl, 0x02
+    mov     bx, 0x8000
+    int     0x13
+    jc      disk_error
 
     in      al, 0x92
     or      al, 2
@@ -39,6 +33,12 @@ delay:
 
     jmp     0x08:pm_start
 
+disk_error:
+    mov     si, error_msg
+    call    print_rm
+    hlt
+    jmp     $
+
 print_rm:
     lodsb
     or      al, al
@@ -51,7 +51,6 @@ print_rm:
     ret
 
 [bits 32]
-
 pm_start:
     mov     ax, 0x10
     mov     ds, ax
@@ -60,62 +59,13 @@ pm_start:
     mov     gs, ax
     mov     ss, ax
 
-    mov     edi, 0xb8000
-    mov     ax, 0x1f20
-    mov     ecx, 80*25
-    rep     stosw
+    mov     ebp, 0x90000
+    mov     esp, ebp
 
-    mov     edi, 0xb8000 + (9*160 + 50)
-    mov     ah, 0x1e
-    mov     esi, title_msg
-    call    print_pm
+    jmp     0x8000
 
-    mov     edi, 0xb8000 + (12*160 + 44)
-    mov     ah, 0x1a
-    mov     esi, success_msg
-    call    print_pm
-
-    mov     eax, 0
-    cpuid
-    mov     dword [vendor_str], ebx
-    mov     dword [vendor_str+4], edx
-    mov     dword [vendor_str+8], ecx
-    mov     byte [vendor_str+12], 0
-
-    mov     edi, 0xb8000 + (15*160 + 40)
-    mov     ah, 0x1f
-    mov     esi, cpu_label
-    call    print_pm
-
-    mov     edi, 0xb8000 + (15*160 + 70)
-    mov     ah, 0x1b
-    mov     esi, vendor_str
-    call    print_pm
-
-    cli
-halt:
-    hlt
-    jmp     halt
-
-print_pm:
-.next:
-    lodsb
-    or      al, al
-    jz      .done
-    stosw
-    jmp     .next
-.done:
-    ret
-
-boot_msg     db 13,10,"Booting my custom bootloader...",0
-dot          db ".",0
-newline      db 13,10,0
-
-title_msg    db "Custom x86 Bootloader",0
-success_msg  db "Protected mode active!",0
-cpu_label    db "CPU:",0
-
-vendor_str   times 13 db 0
+boot_drive  db 0
+error_msg   db "Disk read error!", 0
 
 gdt_null:
     dd 0
